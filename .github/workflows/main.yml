@@ -12,9 +12,9 @@ on:
 
 jobs:
   generic:
-    
+
     runs-on: ${{ matrix.os }}
-    
+ 
     strategy:
       fail-fast: false
       matrix:
@@ -45,12 +45,15 @@ jobs:
 
       - name: Build & Install
         shell: bash -l {0}
-        
         run: cmake --build . --target install --config Release
-        
         working-directory: build
-   
-      - name: Test
+ 
+      - name: Run C++ Test
+        shell: bash -l {0}
+        run: ctest. --output-on-failure
+        working-directory: build
+
+      - name: Run Python Test
         shell: bash -l {0}
         run: pytest . --reruns 5
         working-directory: test
