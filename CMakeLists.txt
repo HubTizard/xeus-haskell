@@ -276,14 +276,6 @@ if(EMSCRIPTEN)
     XEUS_HASKELL_set_kernel_options(xhaskell)
     xeus_wasm_compile_options(xhaskell)
     xeus_wasm_link_options(xhaskell "web,worker")
-    target_link_options(xhaskell PRIVATE
-      "-sEXPORTED_FUNCTIONS=['_main','_emscripten_longjmp']"
-      "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap']"
-      "-sALLOW_MEMORY_GROWTH=1"
-      "-sEXIT_RUNTIME=1"
-      "-sFORCE_FILESYSTEM=1"
-      "-sERROR_ON_UNDEFINED_SYMBOLS=0"
-    )
 endif()
 
 
@@ -373,17 +365,19 @@ include(MicroHs)
 fetch_and_build_microhs(MICROHS_BIN MICROHS_SRC_DIR)
 build_and_install_libmhs(${MICROHS_BIN} ${MICROHS_SRC_DIR})
 
-include(MicroUnitTesting)
-enable_testing()
-fetch_ut()
-add_executable(test_mhs_repl test/test_mhs_repl.cpp src/mhs_repl.cpp)
-add_dependencies(test_mhs_repl mhs_obj)
-target_include_directories(test_mhs_repl
-  PUBLIC
-  $<BUILD_INTERFACE:${XEUS_HASKELL_INCLUDE_DIR}>
-  $<INSTALL_INTERFACE:include>
-  PRIVATE
-  ${MHS_INCLUDE_DIR})
-target_compile_definitions(test_mhs_repl PRIVATE MICROHS_RUNTIME_DIR="${MICROHS_SRC_DIR}")
-target_link_libraries(test_mhs_repl PRIVATE ${MHS_OBJ} Boost::ut)
-add_test(NAME test_mhs_repl COMMAND test_mhs_repl)
+if(NOT EMSCRIPTEN)
+    include(MicroUnitTesting)
+    enable_testing()
+    fetch_ut()
+    add_executable(test_mhs_repl test/test_mhs_repl.cpp src/mhs_repl.cpp)
+    add_dependencies(test_mhs_repl mhs_obj)
+    target_include_directories(test_mhs_repl
+        PUBLIC
+            $<BUILD_INTERFACE:${XEUS_HASKELL_INCLUDE_DIR}>
+            $<INSTALL_INTERFACE:include>
+        PRIVATE
+            ${MHS_INCLUDE_DIR})
+    target_compile_definitions(test_mhs_repl PRIVATE MICROHS_RUNTIME_DIR="${MICROHS_SRC_DIR}")
+    target_link_libraries(test_mhs_repl PRIVATE ${MHS_OBJ} Boost::ut)
+    add_test(NAME test_mhs_repl COMMAND test_mhs_repl)
+endif()
