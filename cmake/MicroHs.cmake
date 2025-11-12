@@ -4,19 +4,26 @@ function(fetch_and_build_microhs MICROHS_BIN MICROHS_SRC_DIR)
     set(MICROHS_VERSION "v0.14.21.0")
     set(MICROHS_URL "https://github.com/augustss/MicroHs/archive/refs/tags/${MICROHS_VERSION}.tar.gz")
     set(MICROHS_PREFIX "${CMAKE_BINARY_DIR}/microhs")
+    if(WIN32)
+      set(MICROHS_MHS_FILE "Makefile.windows")
+      set(MICROHS_MHS_BIN "bin/mhs.exe")
+    else()
+      set(MICROHS_MAKEFILE "Makefile")
+      set(MICROHS_MHS_BIN "bin/mhs")
+    endif()
 
     ExternalProject_Add(MicroHsProject
         URL ${MICROHS_URL}
         DOWNLOAD_EXTRACT_TIMESTAMP TRUE
         PREFIX ${MICROHS_PREFIX}
         CONFIGURE_COMMAND ""
-        BUILD_COMMAND make -C <SOURCE_DIR> bin/mhs
+        BUILD_COMMAND make -f ${MICROHS_MAKEFILE} -C <SOURCE_DIR> ${MICROHS_MHS_BIN}
         INSTALL_COMMAND ""
     )
 
     ExternalProject_Get_Property(MicroHsProject SOURCE_DIR)
     set(${MICROHS_SRC_DIR} ${SOURCE_DIR} PARENT_SCOPE)
-    set(${MICROHS_BIN} "${SOURCE_DIR}/bin/mhs" PARENT_SCOPE)
+    set(${MICROHS_BIN} "${SOURCE_DIR}/${MICROHS_MHS_BIN}" PARENT_SCOPE)
 endfunction()
 
 function(build_and_install_libmhs MICROHS_BIN MICROHS_SRC_DIR)
@@ -25,7 +32,7 @@ function(build_and_install_libmhs MICROHS_BIN MICROHS_SRC_DIR)
     set(REPL_O "${CMAKE_CURRENT_BINARY_DIR}/Repl.o")
     set(EVAL_O "${CMAKE_CURRENT_BINARY_DIR}/eval.o")
 
-    if(CMAKE_HOST_WIN32)
+    if(WIN32)
       set(MICROHS_OS_RUNTIME_DIR "${MICROHS_SRC_DIR}/src/runtime/windows")
     else()
       set(MICROHS_OS_RUNTIME_DIR "${MICROHS_SRC_DIR}/src/runtime/unix")
