@@ -48,11 +48,13 @@ configure_file (
 # =============
 
 option(XEUS_HASKELL_BUILD_STATIC "Build xeus-haskell static library" ON)
-OPTION(XEUS_HASKELL_BUILD_SHARED "Split xhaskell build into executable and library" ON)
+# CHANGED: default OFF instead of ON
+OPTION(XEUS_HASKELL_BUILD_SHARED "Split xhaskell build into executable and library" OFF)
 OPTION(XEUS_HASKELL_BUILD_EXECUTABLE "Build the xhaskell executable" ON)
 
 OPTION(XEUS_HASKELL_USE_SHARED_XEUS "Link xhaskell  with the xeus shared library (instead of the static library)" ON)
-OPTION(XEUS_HASKELL_USE_SHARED_XEUS_HASKELL "Link xhaskell  with the xeus shared library (instead of the static library)" ON)
+# CHANGED: default OFF instead of ON, so xhaskell links against xeus-haskell-static
+OPTION(XEUS_HASKELL_USE_SHARED_XEUS_HASKELL "Link xhaskell  with the xeus shared library (instead of the static library)" OFF)
 
 if(EMSCRIPTEN)
     add_compile_definitions(XEUS_HASKELL_EMSCRIPTEN_WASM_BUILD)
