@@ -66,6 +66,20 @@ int main() {
         expect_trim_eq(res.output, "42");
     };
 
+    "redefinitions replace old values"_test = [] {
+        announce("redefinitions replace old values");
+        auto& repl = repl_instance();
+        auto first = repl.execute("xh_redef_test = 1");
+        expect(first.ok);
+
+        auto redef = repl.execute("xh_redef_test = 5");
+        expect(redef.ok);
+
+        auto res = repl.execute("xh_redef_test");
+        expect(res.ok);
+        expect_trim_eq(res.output, "5");
+    };
+
     "expressions evaluate"_test = [] {
         announce("expressions evaluate");
         auto& repl = repl_instance();

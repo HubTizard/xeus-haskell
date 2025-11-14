@@ -15,7 +15,7 @@ import MHSPrelude
 
 import Control.Exception (try, SomeException, displayException)
 import Data.IORef
-import Data.List (intercalate)
+import Data.List (intercalate, nub)
 import Foreign.C.String (CString, peekCString, peekCStringLen, newCString)
 import Foreign.C.Types (CInt, CSize)
 import Foreign.Marshal.Alloc (free)
@@ -26,7 +26,7 @@ import MicroHs.Compile (Cache, compileModuleP, compileToCombinators, emptyCache,
 import MicroHs.CompileCache (cachedModules)
 import MicroHs.Desugar (LDef)
 import MicroHs.Exp (Exp(Var))
-import MicroHs.Expr (ImpType(..))
+import MicroHs.Expr (EModule(..), EDef(..), ImpType(..), patVars)
 import MicroHs.Flags (Flags, defaultFlags)
 import MicroHs.Ident (Ident, mkIdent, qualIdent)
 import MicroHs.Parse (parse, pExprTop, pTopModule)
@@ -54,17 +54,31 @@ writeErrorCString errPtr msg =
 
 type ReplHandle = StablePtr (IORef ReplCtx)
 
+data StoredDef = StoredDef
+  { sdCode :: String
+  , sdNames :: [Ident]
+  }
+
 data ReplCtx = ReplCtx
   { rcFlags :: Flags
   , rcCache :: Cache
-  , rcDefs  :: String
+  , rcDefs  :: [StoredDef]
   }
 
 initialCtx :: IO ReplCtx
 initialCtx = do
   dir <- getMhsDir
   let flags = defaultFlags dir
-  pure ReplCtx { rcFlags = flags, rcCache = emptyCache, rcDefs = "" }
+  pure ReplCtx { rcFlags = flags, rcCache = emptyCache, rcDefs = [] }
+
+defsSource :: [StoredDef] -> String
+defsSource = concatMap sdCode
+
+stripRedefined :: [StoredDef] -> [Ident] -> [StoredDef]
+stripRedefined defs [] = defs
+stripRedefined defs names = filter noOverlap defs
+  where
+    noOverlap def = all (`notElem` names) (sdNames def)
 
 --------------------------------------------------------------------------------
 -- Error
@@ -116,9 +130,9 @@ runReplAction act h srcPtr srcLen errPtr = do
   ref <- deRefStablePtr h
   src <- peekSource srcPtr srcLen
   ctx <- readIORef ref
-  result <- try (act ctx src)
+  result <- try (act ctx src) :: IO (Either SomeException (Either ReplError ReplCtx))
   let normalized = case result of
-        Left (ex :: SomeException) -> Left (ReplRuntimeError (displayException ex))
+        Left ex -> Left (ReplRuntimeError (displayException ex))
         Right r -> r
   case normalized of
     Left e -> writeErrorCString errPtr (prettyReplError e) >> pure c_ERR
@@ -186,17 +200,23 @@ runAction cache cmdl ident = do
 replDefine :: ReplCtx -> String -> IO (Either ReplError ReplCtx)
 replDefine ctx snippet = do
   let snippet' = ensureTrailingNewline snippet
-      defs'    = rcDefs ctx ++ snippet'
-      src      = buildModule defs'
-  cm <- compileModule ctx{ rcDefs = defs' } src
-  case cm of
-    Left err          -> pure (Left err)
-    Right (_, cache') -> pure (Right ctx{ rcDefs = defs', rcCache = cache' })
+  namesResult <- pure (extractDefinitionNames snippet')
+  case namesResult of
+    Left perr -> pure (Left (ReplParseError perr))
+    Right names -> do
+      let uniqueNames = nub names
+          retainedDefs = stripRedefined (rcDefs ctx) uniqueNames
+          defsWithNew = retainedDefs ++ [StoredDef snippet' uniqueNames]
+          src = buildModule (defsSource defsWithNew)
+      cm <- compileModule ctx src
+      case cm of
+        Left err          -> pure (Left err)
+        Right (_, cache') -> pure (Right ctx{ rcDefs = defsWithNew, rcCache = cache' })
 
 replRun :: ReplCtx -> String -> IO (Either ReplError ReplCtx)
 replRun ctx stmt = do
   let block = runBlock stmt
-      src = buildModule (rcDefs ctx ++ block)
+      src = buildModule (defsSource (rcDefs ctx) ++ block)
   cm <- compileModule ctx src
   case cm of
     Left err -> pure (Left err)
@@ -221,7 +241,7 @@ mhsReplExecute = runReplAction replExecute
 
 replExecute :: ReplCtx -> String -> IO (Either ReplError ReplCtx)
 replExecute ctx snippet =
-  let candidateDefs = rcDefs ctx ++ ensureTrailingNewline snippet
+  let candidateDefs = defsSource (rcDefs ctx) ++ ensureTrailingNewline snippet
   in
     if canParseDefinition candidateDefs
       then replDefine ctx snippet
@@ -254,6 +274,33 @@ canParseExpression snippet =
   case parse pExprTop "<xhaskell-expr>" snippet of
     Right _ -> True
     Left _  -> False
+
+extractDefinitionNames :: String -> Either String [Ident]
+extractDefinitionNames snippet =
+  case parse pTopModule "<xhaskell-define-names>" (buildModule snippet) of
+    Left err -> Left err
+    Right mdl -> Right (definitionNamesFromModule mdl)
+
+definitionNamesFromModule :: EModule -> [Ident]
+definitionNamesFromModule (EModule _ _ defs) = concatMap definitionNames defs
+  where
+    definitionNames def =
+      case def of
+        Data lhs _ _        -> [lhsIdent lhs]
+        Newtype lhs _ _     -> [lhsIdent lhs]
+        Type lhs _          -> [lhsIdent lhs]
+        Fcn name _          -> [name]
+        PatBind pat _       -> patVars pat
+        Sign names _        -> names
+        KindSign name _     -> [name]
+        Pattern lhs _ _     -> [lhsIdent lhs]
+        Class _ lhs _ _     -> [lhsIdent lhs]
+        DfltSign name _     -> [name]
+        ForImp _ _ name _   -> [name]
+        Infix _ names       -> names
+        _                   -> []
+
+    lhsIdent (name, _) = name
 
 mhsReplCanParseDefinition :: CString -> CSize -> IO CInt
 mhsReplCanParseDefinition ptr len = do
