@@ -14,7 +14,6 @@ jobs:
   generic:
 
     runs-on: ${{ matrix.os }}
- 
     strategy:
       fail-fast: false
       matrix:
@@ -96,6 +95,8 @@ jobs:
           export PREFIX=$MAMBA_ROOT_PREFIX/envs/xeus-haskell-wasm-host
           export CMAKE_PREFIX_PATH=$PREFIX
           export CMAKE_SYSTEM_PREFIX_PATH=$PREFIX
+
+          unset CFLAGS CXXFLAGS LDFLAGS
 
           emcmake cmake \
             -DCMAKE_BUILD_TYPE=Release                        \
