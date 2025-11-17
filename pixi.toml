@@ -3,7 +3,7 @@ authors = ["TANIGUCHI Masaya <ta2gch@gmail.com>"]
 channels = ["conda-forge"]
 name = "xeus-haskell"
 version = "0.1.0"
-platforms = []
+platforms = ["linux-64", "linux-aarch64", "osx-arm64", "win-64"]
 
 # [tasks]
 
@@ -12,7 +12,7 @@ platforms = []
 #
 # docs
 [feature.docs]
-platforms = ["linux-64", "linux-aarch64", "osx-arm64"]
+platforms = ["linux-64", "linux-aarch64", "osx-arm64", "win-64"]
 channels = ["conda-forge"]
 
 [feature.docs.dependencies]
@@ -27,7 +27,7 @@ mkdocs-mermaid2-plugin = ">=1.2.3, <2"
 #
 
 [feature.dev]
-platforms = ["linux-64", "linux-aarch64", "osx-arm64"]
+platforms = ["linux-64", "linux-aarch64", "osx-arm64", "win-64"]
 channels = ["conda-forge"]
 
 [feature.dev.dependencies]
