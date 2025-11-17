@@ -33,6 +33,7 @@ cd xeus-haskell
 pixi install -e prebuild
 pixi run -e wasm-build prebuild
 pixi run -e wasm-build build
+pixi run -e wasm-build install
 # pixi run -e wasm-build fix-emscripten-links # Run this if you encounter linking errors
 pixi run -e wasm-build serve # JupyterLite is ready!
 ~~~
