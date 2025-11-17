@@ -18,10 +18,10 @@ Jupyter protocol [xeus](https://github.com/jupyter-xeus/xeus).
 
 git clone https://github.com/tani/xeus-haskell
 pushd xeus-haskell
-pixi run -e dev prebuild
-pixi run -e dev build
-pixi run -e dev install
-pixi run -e dev serve # JupyterLab is ready!
+pixi run prebuild
+pixi run build
+pixi run install
+pixi run serve # JupyterLab is ready!
 ```
 
 ### For webassembly JupyterLite

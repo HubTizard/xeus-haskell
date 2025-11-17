@@ -5,45 +5,7 @@ name = "xeus-haskell"
 version = "0.1.0"
 platforms = ["linux-64", "linux-aarch64", "osx-arm64", "win-64"]
 
-# [tasks]
-
-# [dependencies]
-
-#
-# docs
-[feature.docs]
-platforms = ["linux-64", "linux-aarch64", "osx-arm64", "win-64"]
-channels = ["conda-forge"]
-
-[feature.docs.dependencies]
-mkdocs = "*"
-mkdocs-material = "*"
-
-[feature.docs.pypi-dependencies]
-mkdocs-mermaid2-plugin = ">=1.2.3, <2"
-
-#
-# dev
-#
-
-[feature.dev]
-platforms = ["linux-64", "linux-aarch64", "osx-arm64", "win-64"]
-channels = ["conda-forge"]
-
-[feature.dev.dependencies]
-make = "*"
-cmake = "*"
-cxx-compiler = "*"
-xeus-zmq = ">=3.0.0,<4.0"
-nlohmann_json = "*"
-cppzmq = "*"
-pytest = "*"
-jupyter_kernel_test = ">=0.4.3"
-nbval = "*"
-pytest-rerunfailures = "*"
-jupyterlab = "*"
-
-[feature.dev.tasks]
+[tasks]
 prebuild = """
 cmake
   -S $PWD
@@ -58,6 +20,33 @@ install = "cmake --install build --config Release"
 ctest = "ctest --test-dir build --build-config Release --output-on-failure"
 pytest = "pytest test --reruns 5"
 serve = "jupyter lab"
+
+[dependencies]
+make = "*"
+cmake = "*"
+cxx-compiler = "*"
+xeus-zmq = ">=3.0.0,<4.0"
+nlohmann_json = "*"
+cppzmq = "*"
+pytest = "*"
+jupyter_kernel_test = ">=0.4.3"
+nbval = "*"
+pytest-rerunfailures = "*"
+jupyterlab = "*"
+
+#
+# docs
+#
+[feature.docs]
+platforms = ["linux-64", "linux-aarch64", "osx-arm64", "win-64"]
+channels = ["conda-forge"]
+
+[feature.docs.dependencies]
+mkdocs = "*"
+mkdocs-material = "*"
+
+[feature.docs.pypi-dependencies]
+mkdocs-mermaid2-plugin = ">=1.2.3, <2"
 
 #
 # wasm-build
@@ -124,7 +113,6 @@ xeus = ">=5.0.0,<6.0"
 xtl = ">=0.7,<0.8"
 
 [feature.wasm-host.tasks]
-prebuild = "echo ok"
 
 #
 # Environments
@@ -132,6 +120,5 @@ prebuild = "echo ok"
 
 [environments]
 docs = { features = ["docs"], no-default-feature = true }
-dev = { features = ["dev"], no-default-feature = true }
 wasm-build = { features = ["wasm-build"], no-default-feature = true }
 wasm-host = { features = ["wasm-host"], no-default-feature = true }
