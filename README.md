@@ -44,7 +44,7 @@ pixi run -e wasm-build serve # JupyterLite is ready!
 
 To try out xeus-haskell interactively in your web browser, just click on the link:
 
-[Jupyterlite for Haskell](https://tani.github.io/xeus-haskell)
+[Jupyterlite for Haskell](https://jupyter-xeus.github.io/xeus-haskell)
 
 ## Dependencies
 
