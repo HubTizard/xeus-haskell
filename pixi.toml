@@ -104,7 +104,7 @@ jupyter lite serve
   --XeusAddon.prefix="$PREFIX"
   --XeusAddon.mounts="$MHSDIR:/share/microhs"
   --XeusAddon.mounts="$PWD/src/XHaskell:/usr/lib/haskell-packages/microhs/XHaskell"
-  --contents notebooks/introduction_to_haskell.ipynb
+  --contents notebooks
 """
 generate = """
 export PREFIX=$CONDA_PREFIX/../wasm-host;
