@@ -183,6 +183,7 @@ moduleHeader = unlines
   , "import Prelude"
   , "import System.IO.PrintOrRun"
   , "import Data.Typeable"
+  , "import Numeric"
   ]
 
 runResultName :: String
