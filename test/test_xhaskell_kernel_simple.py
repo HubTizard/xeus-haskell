@@ -169,6 +169,30 @@ class XHaskellKernelTests(jupyter_kernel_test.KernelTests):
         payload = self._extract_plain_text(outputs)
         self.assertIn("hello from xeus", payload)
 
+    def test_completion_filters_prefix(self) -> None:
+        """Completion should honor the prefix at the cursor position."""
+        self.flush_channels()
+        reply, _ = self._execute_or_skip(code="xh_comp_value = 123")
+        self.assertEqual(reply["content"]["status"], "ok")
+
+        self.flush_channels()
+        msg_id = self.kc.complete(code="xh_comp", cursor_pos=7)
+        try:
+            reply_msg = self.kc.get_shell_msg(timeout=jupyter_kernel_test.TIMEOUT)
+        except Empty as exc:  # pragma: no cover - exercised in CI only
+            self.skipTest(f"xhaskell kernel timed out while completing: {exc}")
+            return
+
+        self.assertEqual(reply_msg["parent_header"].get("msg_id"), msg_id)
+        content = reply_msg["content"]
+        self.assertEqual(content.get("status"), "ok")
+
+        matches = content.get("matches", [])
+        self.assertIn("xh_comp_value", matches)
+        self.assertNotIn("where", matches)  # should be filtered out by prefix
+        self.assertEqual(content.get("cursor_start"), 0)
+        self.assertEqual(content.get("cursor_end"), 7)
+
 
 if __name__ == "__main__":
     unittest.main()

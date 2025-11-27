@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <string_view>
+#include <vector>
 #include "Repl_stub.h"
 
 namespace xeus_haskell {
@@ -18,6 +19,7 @@ public:
     ~MicroHsRepl(); // calls mhs_repl_free()
 
     repl_result execute(std::string_view code);
+    std::vector<std::string> completion_candidates();
 
 private:
     uintptr_t context = 0;

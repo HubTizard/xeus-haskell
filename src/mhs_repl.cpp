@@ -1,8 +1,11 @@
 #include <functional>
 #include <string>
 #include <string_view>
+#include <vector>
 #include <cstdio>
 #include <stdexcept>
+#include <sstream>
+#include <cstdlib>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -203,6 +206,43 @@ repl_result MicroHsRepl::execute(std::string_view code) {
         return {false, std::string(), std::string(e.what())};
     }
     return {true, std::move(output), std::string()};
+}
+
+std::vector<std::string> MicroHsRepl::completion_candidates() {
+    char* raw = nullptr;
+    intptr_t rc = mhs_repl_completion_candidates_cstr(
+        context,
+        reinterpret_cast<void*>(&raw)
+    );
+    std::string output;
+    if (rc == 0 && raw != nullptr) {
+        output.assign(raw);
+        mhs_repl_free_cstr(raw);
+    } else {
+        if (raw) {
+            mhs_repl_free_cstr(raw);
+        }
+        try {
+            output = capture_stdout([&]() {
+                mhs_repl_completion_candidates(context);
+            });
+        } catch (const std::runtime_error&) {
+            return {};
+        }
+    }
+
+    std::vector<std::string> candidates;
+    std::stringstream ss(output);
+    std::string line;
+    while (std::getline(ss, line)) {
+        if (!line.empty() && line.back() == '\r') {
+            line.pop_back();
+        }
+        if (!line.empty()) {
+            candidates.push_back(line);
+        }
+    }
+    return candidates;
 }
 
 } // namespace xeus_haskell

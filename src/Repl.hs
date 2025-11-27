@@ -7,12 +7,15 @@ module Repl (
   mhsReplRun,
   mhsReplFreeCString,
   mhsReplCanParseDefinition,
-  mhsReplCanParseExpression
+  mhsReplCanParseExpression,
+  mhsReplCompletionCandidates,
+  mhsReplCompletionCandidatesCString
 ) where
 
 import qualified Prelude ()
 import MHSPrelude
 
+import System.IO (putStrLn)
 import Control.Exception (try, SomeException, displayException)
 import Data.IORef
 import Data.List (foldl', intercalate, nub)
@@ -30,13 +33,14 @@ import MicroHs.Desugar (LDef)
 import MicroHs.Exp (Exp(Var))
 import MicroHs.Expr (EModule(..), EDef(..), ImpType(..), patVars)
 import MicroHs.Flags (Flags, defaultFlags)
-import MicroHs.Ident (Ident, mkIdent, qualIdent, unQualIdent)
+import MicroHs.Ident (Ident, mkIdent, qualIdent, unQualIdent, SLoc(..))
 import qualified MicroHs.IdentMap as IMap
 import MicroHs.Parse (parse, pExprTop, pTopModule)
 import MicroHs.StateIO (runStateIO)
 import MicroHs.TypeCheck (TModule(..), tBindingsOf)
 import MicroHs.Translate (TranslateMap, translateMap, translateWithMap)
 import Unsafe.Coerce (unsafeCoerce)
+import MicroHs.Lex
 
 --------------------------------------------------------------------------------
 -- Constants
@@ -129,6 +133,8 @@ foreign export ccall "mhs_repl_execute"     mhsReplExecute      :: ReplHandle ->
 foreign export ccall "mhs_repl_free_cstr"   mhsReplFreeCString  :: CString -> IO ()
 foreign export ccall "mhs_repl_can_parse_definition" mhsReplCanParseDefinition :: CString -> CSize -> IO CInt
 foreign export ccall "mhs_repl_can_parse_expression" mhsReplCanParseExpression :: CString -> CSize -> IO CInt
+foreign export ccall "mhs_repl_completion_candidates" mhsReplCompletionCandidates :: ReplHandle-> IO ()
+foreign export ccall "mhs_repl_completion_candidates_cstr" mhsReplCompletionCandidatesCString :: ReplHandle -> Ptr CString -> IO CInt
 
 mhsReplNew :: CString -> CSize -> IO ReplHandle
 mhsReplNew cstr csize = do
@@ -343,3 +349,52 @@ mhsReplCanParseExpression :: CString -> CSize -> IO CInt
 mhsReplCanParseExpression ptr len = do
   code <- peekSource ptr len
   pure $ if canParseExpression code then 1 else 0
+
+tokenize :: String -> [Token]
+tokenize = lex (SLoc "" 1 1)
+
+extractIdents :: [Token] -> [String]
+extractIdents ts = [s | TIdent _ _ s <- ts]
+
+completionCandidates :: String -> [String]
+completionCandidates = extractIdents . tokenize
+
+-- List of standard Haskell keywords and reserved operators
+reservedIds :: [String]
+reservedIds =
+  [ "case", "class", "data", "default", "deriving", "do", "else"
+  , "foreign", "if", "import", "in", "infix", "infixl", "infixr"
+  , "instance", "let", "module", "newtype", "of", "then", "type"
+  , "where", "_"
+  ]
+
+-- The FFI export implementation
+mhsReplCompletionCandidates :: ReplHandle -> IO ()
+mhsReplCompletionCandidates h = do
+  -- 1. Dereference the stable pointer to get the IORef
+  ref <- deRefStablePtr h
+  -- 2. Read the current context
+  ctx <- readIORef ref
+  -- 3. Extract the source code from the stored definitions
+  let source = currentDefsSource ctx
+  -- Extract identifiers using the existing helper (Tokenize -> Extract)
+  let localIdents = completionCandidates source
+  -- Combine reserved words with local identifiers and deduplicate
+  let allCandidates = nub (reservedIds ++ localIdents)
+  -- Print each candidate on a new line (use mapM_ for IO actions, not map)
+  mapM_ putStrLn allCandidates
+
+mhsReplCompletionCandidatesCString :: ReplHandle -> Ptr CString -> IO CInt
+mhsReplCompletionCandidatesCString h outPtr = do
+  ref <- deRefStablePtr h
+  ctx <- readIORef ref
+  let source = currentDefsSource ctx
+      localIdents = completionCandidates source
+      allCandidates = nub (reservedIds ++ localIdents)
+      body = intercalate "\n" allCandidates
+  if outPtr == nullPtr
+    then pure c_ERR
+    else do
+      cbody <- newCString body
+      poke outPtr cbody
+      pure c_OK

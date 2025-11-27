@@ -10,6 +10,8 @@
 #include <vector>
 #include <iostream>
 #include <stdexcept>
+#include <cctype>
+#include <algorithm>
 
 #include "nlohmann/json.hpp"
 
@@ -96,33 +98,47 @@ namespace xeus_haskell
     nl::json interpreter::complete_request_impl(const std::string&  code,
                                                      int cursor_pos)
     {
-        // Should be replaced with code performing the completion
-        // and use the returned `matches` to `create_complete_reply`
-        // i.e if the code starts with 'H', it could be the following completion
-        if (code[0] == 'H')
-        {
-       
-            return xeus::create_complete_reply(
-                {
-                    std::string("Hello"), 
-                    std::string("Hey"), 
-                    std::string("Howdy")
-                },          /*matches*/
-                5,          /*cursor_start*/
-                cursor_pos  /*cursor_end*/
-            );
+        auto is_ident_char = [](char c) {
+            return std::isalnum(static_cast<unsigned char>(c)) || c == '_' || c == '\'';
+        };
+
+        const std::size_t code_size = code.size();
+        const std::size_t cursor = static_cast<std::size_t>(
+            std::max(0, std::min(cursor_pos, static_cast<int>(code_size))));
+
+        std::size_t start = cursor;
+        while (start > 0 && is_ident_char(code[start - 1])) {
+            --start;
         }
 
-        // No completion result
-        else
-        {
-
-            return xeus::create_complete_reply(
-                nl::json::array(),  /*matches*/
-                cursor_pos,         /*cursor_start*/
-                cursor_pos          /*cursor_end*/
-            );
+        if (start == cursor && cursor > 0) {
+            // Fallback in case locale-dependent isalnum disagrees with our identifier check.
+            const std::string before_cursor = code.substr(0, cursor);
+            const std::string ident_chars =
+                "abcdefghijklmnopqrstuvwxyz"
+                "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                "0123456789"
+                "_'";
+            const auto last_non_ident = before_cursor.find_last_not_of(ident_chars);
+            start = (last_non_ident == std::string::npos) ? 0 : last_non_ident + 1;
         }
+
+        const std::string prefix = code.substr(start, cursor - start);
+        const auto candidates = m_repl.completion_candidates();
+        std::vector<std::string> matches;
+        matches.reserve(candidates.size());
+
+        for (const auto& cand : candidates) {
+            if (cand.rfind(prefix, 0) == 0) {
+                matches.push_back(cand);
+            }
+        }
+
+        return xeus::create_complete_reply(
+            matches,                       /*matches*/
+            static_cast<int>(start),       /*cursor_start*/
+            static_cast<int>(cursor)       /*cursor_end*/
+        );
     }
 
     nl::json interpreter::inspect_request_impl(const std::string& /*code*/,
