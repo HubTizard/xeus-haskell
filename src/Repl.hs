@@ -9,7 +9,8 @@ module Repl (
   mhsReplCanParseDefinition,
   mhsReplCanParseExpression,
   mhsReplCompletionCandidates,
-  mhsReplInspect
+  mhsReplInspect,
+  mhsReplIsComplete
 ) where
 
 import qualified Prelude ()
@@ -132,6 +133,7 @@ foreign export ccall "mhs_repl_free"        mhsReplFree         :: ReplHandle ->
 foreign export ccall "mhs_repl_define"      mhsReplDefine       :: ReplHandle -> CString -> CSize -> Ptr CString -> IO CInt
 foreign export ccall "mhs_repl_run"         mhsReplRun          :: ReplHandle -> CString -> CSize -> Ptr CString -> IO CInt
 foreign export ccall "mhs_repl_execute"     mhsReplExecute      :: ReplHandle -> CString -> CSize -> Ptr CString -> IO CInt
+foreign export ccall "mhs_repl_is_complete" mhsReplIsComplete :: ReplHandle -> CString -> CSize -> IO CString
 foreign export ccall "mhs_repl_free_cstr"   mhsReplFreeCString  :: CString -> IO ()
 foreign export ccall "mhs_repl_can_parse_definition" mhsReplCanParseDefinition :: CString -> CSize -> IO CInt
 foreign export ccall "mhs_repl_can_parse_expression" mhsReplCanParseExpression :: CString -> CSize -> IO CInt
@@ -277,6 +279,33 @@ mhsReplRun = runReplAction replRun
 
 mhsReplExecute :: ReplHandle -> CString -> CSize -> Ptr CString -> IO CInt
 mhsReplExecute = runReplAction replExecute
+mhsReplIsComplete :: ReplHandle -> CString -> CSize -> IO CString
+mhsReplIsComplete h srcPtr srcLen = do
+  ref <- deRefStablePtr h
+  src <- peekSource srcPtr srcLen
+  ctx <- readIORef ref
+  status <- replIsComplete ctx src
+  newCString status
+
+replIsComplete :: ReplCtx -> String -> IO String
+replIsComplete ctx snippet = do
+  if all isws snippet then pure "complete" else do
+    let ls = lines (ensureTrailingNewline snippet)
+        go n
+          | n < 0 = pure "invalid"
+          | otherwise = do
+              let (defLines, runLines) = splitAt n ls
+                  defPart = unlines defLines
+                  runPart = unlines (dropWhileEnd allwsLine runLines)
+                  candidateDefs = currentDefsSource ctx ++ defPart
+              if canParseDefinition candidateDefs
+                then if all allwsLine runLines
+                     then pure "complete"
+                     else if canParseExpression runPart || canParseExpression ("do\n" ++ indent runPart)
+                          then pure "complete"
+                          else go (n - 1)
+                else go (n - 1)
+    go (length ls)
 
 mhsReplInspect :: ReplHandle -> CString -> CSize -> Ptr CString -> IO CInt
 mhsReplInspect h srcPtr srcLen resPtr = do

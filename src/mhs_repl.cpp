@@ -244,4 +244,17 @@ std::string MicroHsRepl::inspect(std::string_view name) {
   return "";
 }
 
+std::string MicroHsRepl::is_complete(std::string_view code) {
+  std::string code_str(code);
+  char *status = static_cast<char *>(
+      mhs_repl_is_complete(context, const_cast<char *>(code_str.c_str()),
+                           static_cast<uintptr_t>(code_str.size())));
+  if (status) {
+    std::string result(status);
+    mhs_repl_free_cstr(status);
+    return result;
+  }
+  return "unknown";
+}
+
 } // namespace xeus_haskell

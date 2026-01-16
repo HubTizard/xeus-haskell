@@ -8,9 +8,31 @@ Unlike kernels based on GHC, `xeus-haskell` leverages **MicroHs**, a minimal Has
 
 ## Core Components
 
-1. **`src/Repl.hs`**: The heart of the REPL logic, written in Haskell and compiled with MicroHs. It handles module construction, compilation, and execution.
-2. **`src/mhs_repl.cpp`**: A C++ bridge that communicates with the Haskell logic via the Foreign Function Interface (FFI). It also manages standard output redirection to capture execution results.
-3. **`src/xinterpreter.cpp`**: The `xeus` interpreter implementation that orchestrates the kernel lifecycle and delegates execution requests to the C++ bridge.
+### 1. `src/Repl.hs` (The Haskell Engine)
+
+The core logic is written in Haskell and compiled with MicroHs into C code, then linked into the final executable. It is responsible for:
+
+- **Context Management**: Maintaining the `ReplCtx` which stores user-defined code snippets, the compiler's incremental `Cache`, and persistent `Symbols` for type checking.
+- **Parsing and Analysis**: Using `MicroHs.Parse` and `MicroHs.Lex` to validate definitions and expressions.
+- **Incremental Compilation**: Generating a transient `Inline` module that imports the current environment and compiling it to combinators for execution.
+- **Shadowing Logic**: Detecting Redefined identifiers and stripping older versions from the internal state to simulate a natural REPL experience.
+
+### 2. `src/mhs_repl.cpp` (The C++ Bridge)
+
+A mediator between the Xeus kernel and the MicroHs backend. It provides:
+
+- **FFI Wrapper**: A class-based API (`MicroHsRepl`) that manages the `StablePtr` life cycle and translates between C++ strings and FFI-safe types.
+- **Stdout Capture**: A robust platform-specific implementation (using `pipe` and `dup2` on POSIX, or named pipes on Windows) to intercept output from MicroHs's internal runtime.
+- **Resource Management**: Initializing the MicroHs runtime environment and locating the standard library (`MHSDIR`).
+
+### 3. `src/xinterpreter.cpp` (The Jupyter Interface)
+
+The entry point for all Jupyter protocol interactions, inheriting from `xeus::xinterpreter`. It handles:
+
+- **Request Routing**: Mapping incoming messages like `execute_request`, `complete_request`, or `inspect_request` to the appropriate `MicroHsRepl` methods.
+- **MIME Formatting**: Packaging captured results into Jupyter-compatible JSON payloads (e.g., wrapping plain text in `text/plain`).
+- **Kernel Metadata**: Providing details about the implementation, such as the Haskell version and pygments lexer settings.
+- **Lifecycle Control**: Handling kernel shutdown and initialization (warmup).
 
 ---
 
@@ -40,7 +62,7 @@ sequenceDiagram
 
 ### 1. Mixed cell support (Scan and Split)
 
-Unlike standard REPLs that might expect a single statement per line, `xeus-haskell` supports cells containing a mix of definitions and expressions. It applies a **Scan and Split** algorithm to determine the execution boundary:
+Unlike standard REPLs that might expect a single statement per line, `xeus-haskell` supports cells containing a mix of definitions and expressions. It applies a **Scan and Split** algorithm to determine the execution boundary. This same algorithm is used both for **execution** and for **completeness checking** (`is_complete`).
 
 ```mermaid
 flowchart TD
@@ -103,6 +125,16 @@ When an execution block is entered:
 1. **Wrapping**: If the block was identified as requiring monadic execution, it is wrapped in an artificial `do` block and then placed into a temporary `runResult` function inside the "Inline" module.
 2. **Execution wrapper**: It uses `_printOrRun` to correctly handle both pure values (printing them) and `IO` actions (executing them).
 3. **Evaluation**: The temporary module is compiled and executed. Because the previous definitions in the same cell were already committed to the cache in the "Handling Definitions" phase, the expression has access to them immediately.
+
+### 3. Completeness Checking
+
+The kernel implements the `is_complete` request to provide a smooth interactive experience in the Jupyter frontend.
+
+1. **Algorithm Re-use**: The `is_complete` logic uses the same **Scan and Split** algorithm as execution.
+2. **Status Mapping**:
+    - **`complete`**: If the split algorithm finds a boundary where the prefix is a valid set of definitions and the remainder is a valid expression (optionally wrapped in `do`).
+    - **`invalid`**: If the algorithm fails to find any valid boundary after scanning all possible split points.
+    - **`incomplete`**: (Future work) If the code ends with unclosed delimiters (e.g., `let x = 1 in`) or unbalanced braces. Currently, it primarily distinguishes between parseable and unparseable code.
 
 ---
 

@@ -42,7 +42,7 @@ class XHaskellKernelTests(jupyter_kernel_test.KernelTests):
         "data Color = Red | Green | Blue",
     ]
     incomplete_code_samples: list[str] = []
-    invalid_code_samples: list[str] = []  # xhaskell always returns 'complete' for now
+    invalid_code_samples: list[str] = ["1 + *"]
     code_hello_world = ""  # xhaskell currently uses execute_result for IO output
     code_stderr = ""
     code_page_something = ""

@@ -20,6 +20,7 @@ public:
   repl_result execute(std::string_view code);
   std::vector<std::string> completion_candidates();
   std::string inspect(std::string_view name);
+  std::string is_complete(std::string_view code);
 
 private:
   uintptr_t context = 0;

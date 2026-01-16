@@ -78,8 +78,8 @@ nl::json interpreter::is_complete_request_impl(const std::string &code) {
   // Insert code here to validate the ``code``
   // and use `create_is_complete_reply` with the corresponding status
   // "unknown", "incomplete", "invalid", "complete"
-  return xeus::create_is_complete_reply("complete" /*status*/,
-                                        "   " /*indent*/);
+  std::string status = m_repl.is_complete(code);
+  return xeus::create_is_complete_reply(status /*status*/, "   " /*indent*/);
 }
 
 nl::json interpreter::complete_request_impl(const std::string &code,
