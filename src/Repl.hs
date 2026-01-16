@@ -17,8 +17,8 @@ import MHSPrelude
 import System.IO (putStrLn)
 import Control.Exception (try, SomeException, displayException)
 import Data.IORef
-import Data.List (foldl', intercalate, nub)
-import Data.Maybe (isJust)
+import Data.List (foldl', intercalate, nub, reverse, dropWhile)
+import Data.Maybe (isJust, fromMaybe)
 import Foreign.C.String (CString, peekCString, peekCStringLen, newCString)
 import Foreign.C.Types (CInt, CSize)
 import Foreign.Marshal.Alloc (free)
@@ -275,15 +275,39 @@ mhsReplRun = runReplAction replRun
 mhsReplExecute :: ReplHandle -> CString -> CSize -> Ptr CString -> IO CInt
 mhsReplExecute = runReplAction replExecute
 
+isws :: Char -> Bool
+isws c = c == ' ' || c == '\t' || c == '\n' || c == '\r'
+
+allwsLine :: String -> Bool
+allwsLine = all isws
+
+dropWhileEnd :: (a -> Bool) -> [a] -> [a]
+dropWhileEnd p = reverse . dropWhile p . reverse
+
 replExecute :: ReplCtx -> String -> IO (Either ReplError ReplCtx)
-replExecute ctx snippet =
-  let candidateDefs = currentDefsSource ctx ++ ensureTrailingNewline snippet
-  in
-    if canParseDefinition candidateDefs
-      then replDefine ctx snippet
-      else if canParseExpression snippet
-        then replRun ctx snippet
-        else pure (Left (ReplParseError "unable to parse snippet"))
+replExecute ctx snippet = do
+  let ls = lines (ensureTrailingNewline snippet)
+      go n
+        | n < 0 = pure $ Left (ReplParseError "unable to parse snippet")
+        | otherwise = do
+            let (defLines, runLines) = splitAt n ls
+                defPart = unlines defLines
+                runPart = unlines (dropWhileEnd allwsLine runLines)
+                candidateDefs = currentDefsSource ctx ++ defPart
+            if canParseDefinition candidateDefs
+              then if all allwsLine runLines
+                   then replDefine ctx defPart
+                   else
+                     let runBlock = "do\n" ++ indent runPart
+                     in if canParseExpression runBlock
+                        then do
+                          eCtx' <- replDefine ctx defPart
+                          case eCtx' of
+                            Left err -> pure (Left err)
+                            Right ctx' -> replRun ctx' runBlock
+                        else go (n - 1)
+              else go (n - 1)
+  go (length ls)
 
 --------------------------------------------------------------------------------
 -- CString utilities

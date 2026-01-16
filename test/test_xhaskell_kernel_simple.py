@@ -193,6 +193,24 @@ class XHaskellKernelTests(jupyter_kernel_test.KernelTests):
         self.assertEqual(content.get("cursor_start"), 0)
         self.assertEqual(content.get("cursor_end"), 7)
 
+    def test_multi_statement_cell(self) -> None:
+        """Repro Case 1: Mix of definition and expression in one cell."""
+        self.flush_channels()
+        code = 'name = "Haskell Curry"\nputStrLn name'
+        reply, outputs = self._execute_or_skip(code=code)
+        self.assertEqual(reply["content"]["status"], "ok")
+        payload = self._extract_plain_text(outputs)
+        self.assertIn("Haskell Curry", payload)
+
+    def test_multi_expression_cell(self) -> None:
+        """Repro Case 2: Multiple IO actions in one cell."""
+        self.flush_channels()
+        code = 'putStrLn "Hello"\nputStrLn "World"'
+        reply, outputs = self._execute_or_skip(code=code)
+        self.assertEqual(reply["content"]["status"], "ok")
+        payload = self._extract_plain_text(outputs)
+        self.assertIn("Hello", payload)
+        self.assertIn("World", payload)
 
 if __name__ == "__main__":
     unittest.main()

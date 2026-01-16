@@ -15,14 +15,14 @@ curl -fsSL https://pixi.sh/install.sh | sh
 ### Setting Up Your Environment
 
 1. Fork the repository on GitHub.
-2. Clone your fork locally:
+1. Clone your fork locally:
 
 ```bash
 git clone https://github.com/<your-username>/xeus-haskell.git
 cd xeus-haskell
 ```
 
-3. Initialize the development environment:
+1. Initialize the development environment:
 
 ```bash
 pixi run -e dev prebuild
