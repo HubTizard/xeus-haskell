@@ -43,4 +43,5 @@ pixi run -e wasm-build serve # JupyterLite is ready!
 - [Contributing Guide](./CONTRIBUTING.md)
 - [Communication Protocol](./COMMUNICATION.md)
 - [REPL Mechanism](./REPL.md)
+- [Roadmap & TODO](./TODO.md)
 - [AI Agent Guide](../AGENTS.md)
