@@ -305,7 +305,10 @@ replIsComplete ctx snippet = do
                           then pure "complete"
                           else go (n - 1)
                 else go (n - 1)
-    go (length ls)
+    res <- go (length ls)
+    if res == "invalid" && isIncomplete snippet
+      then pure "incomplete"
+      else pure res
 
 mhsReplInspect :: ReplHandle -> CString -> CSize -> Ptr CString -> IO CInt
 mhsReplInspect h srcPtr srcLen resPtr = do
@@ -455,3 +458,31 @@ mhsReplCompletionCandidates h = do
   let localIdents = completionCandidates source
   let allCandidates = nub (reservedIds ++ localIdents)
   mapM_ putStrLn allCandidates
+
+isIncomplete :: String -> Bool
+isIncomplete s = go [] s
+  where
+    go st [] = not (null st)
+    go st (c:cs)
+      | c `elem` "([{" = go (c:st) cs
+      | c `elem` ")]}" = case st of
+          [] -> False
+          (x:xs) -> if match x c then go xs cs else False
+      | c == '"' = goString st cs
+      | c == '\'' = goChar st cs
+      | otherwise = go st cs
+
+    goString st [] = True
+    goString st ('\\':'"':cs) = goString st cs
+    goString st ('"':cs) = go st cs
+    goString st (_:cs) = goString st cs
+
+    goChar st [] = True
+    goChar st ('\\':'\'':cs) = goChar st cs
+    goChar st ('\'':cs) = go st cs
+    goChar st (_:cs) = goChar st cs
+
+    match '(' ')' = True
+    match '[' ']' = True
+    match '{' '}' = True
+    match _ _ = False
