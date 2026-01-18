@@ -7,16 +7,23 @@ module Repl (
   mhsReplRun,
   mhsReplFreeCString,
   mhsReplCanParseDefinition,
-  mhsReplCanParseExpression
+  mhsReplCanParseExpression,
+  mhsReplCompletionCandidates,
+  mhsReplInspect,
+  mhsReplIsComplete
 ) where
 
 import qualified Prelude ()
 import MHSPrelude
 
+import System.Environment (lookupEnv)
+import System.IO (putStrLn)
 import Control.Exception (try, SomeException, displayException)
 import Data.IORef
-import Data.List (foldl', intercalate, nub)
-import Data.Maybe (isJust)
+import Data.List (foldl', intercalate, nub, reverse, dropWhile)
+import Data.Maybe (isJust, fromMaybe, maybeToList)
+import Data.Text (pack, unpack)
+
 import Foreign.C.String (CString, peekCString, peekCStringLen, newCString)
 import Foreign.C.Types (CInt, CSize)
 import Foreign.Marshal.Alloc (free)
@@ -26,17 +33,19 @@ import Foreign.Storable (poke)
 import MicroHs.Builtin (builtinMdl)
 import MicroHs.Compile (Cache, compileModuleP, compileToCombinators, emptyCache)
 import MicroHs.CompileCache (cachedModules)
+import MicroHs.SymTab (SymTab, Entry(..), stLookup, stEmpty)
 import MicroHs.Desugar (LDef)
 import MicroHs.Exp (Exp(Var))
-import MicroHs.Expr (EModule(..), EDef(..), ImpType(..), patVars)
-import MicroHs.Flags (Flags, defaultFlags)
-import MicroHs.Ident (Ident, mkIdent, qualIdent, unQualIdent)
+import MicroHs.Expr (EModule(..), EDef(..), ImpType(..), patVars, showExpr)
+import MicroHs.Flags (Flags, defaultFlags, paths)
+import MicroHs.Ident (Ident, mkIdent, qualIdent, unQualIdent, SLoc(..))
 import qualified MicroHs.IdentMap as IMap
 import MicroHs.Parse (parse, pExprTop, pTopModule)
 import MicroHs.StateIO (runStateIO)
-import MicroHs.TypeCheck (TModule(..), tBindingsOf)
+import MicroHs.TypeCheck (TModule(..), tBindingsOf, Symbols)
 import MicroHs.Translate (TranslateMap, translateMap, translateWithMap)
 import Unsafe.Coerce (unsafeCoerce)
+import MicroHs.Lex
 
 --------------------------------------------------------------------------------
 -- Constants
@@ -66,12 +75,22 @@ data ReplCtx = ReplCtx
   { rcFlags :: Flags
   , rcCache :: Cache
   , rcDefs  :: [StoredDef]
+  , rcSyms  :: Symbols
   }
 
 initialCtx :: String -> IO ReplCtx
 initialCtx dir = do
   let flags = defaultFlags dir
-  pure ReplCtx { rcFlags = flags, rcCache = emptyCache, rcDefs = [] }
+  mpath <- lookupEnv "MHS_LIBRARY_PATH"
+  let rpath = maybe "." id mpath
+      extra = splitColon rpath
+      rcFlags = flags { paths = paths flags ++ extra }
+  pure ReplCtx { rcFlags = rcFlags, rcCache = emptyCache, rcDefs = [], rcSyms = (stEmpty, stEmpty) }
+
+splitColon :: String -> [String]
+splitColon s = case break (== ':') s of
+  (a, [])     -> [a]
+  (a, _:rest) -> a : splitColon rest
 
 defsSource :: [StoredDef] -> String
 defsSource = concatMap sdCode
@@ -126,9 +145,12 @@ foreign export ccall "mhs_repl_free"        mhsReplFree         :: ReplHandle ->
 foreign export ccall "mhs_repl_define"      mhsReplDefine       :: ReplHandle -> CString -> CSize -> Ptr CString -> IO CInt
 foreign export ccall "mhs_repl_run"         mhsReplRun          :: ReplHandle -> CString -> CSize -> Ptr CString -> IO CInt
 foreign export ccall "mhs_repl_execute"     mhsReplExecute      :: ReplHandle -> CString -> CSize -> Ptr CString -> IO CInt
+foreign export ccall "mhs_repl_is_complete" mhsReplIsComplete :: ReplHandle -> CString -> CSize -> IO CString
 foreign export ccall "mhs_repl_free_cstr"   mhsReplFreeCString  :: CString -> IO ()
 foreign export ccall "mhs_repl_can_parse_definition" mhsReplCanParseDefinition :: CString -> CSize -> IO CInt
 foreign export ccall "mhs_repl_can_parse_expression" mhsReplCanParseExpression :: CString -> CSize -> IO CInt
+foreign export ccall "mhs_repl_completion_candidates" mhsReplCompletionCandidates :: ReplHandle -> IO ()
+foreign export ccall "mhs_repl_inspect" mhsReplInspect :: ReplHandle -> CString -> CSize -> Ptr CString -> IO CInt
 
 mhsReplNew :: CString -> CSize -> IO ReplHandle
 mhsReplNew cstr csize = do
@@ -202,15 +224,14 @@ ensureTrailingNewline s
   | otherwise      = s ++ "\n"
 
 
-compileModule :: ReplCtx -> String -> IO (Either ReplError (TModule [LDef], Cache))
 compileModule ctx src =
   case parse pTopModule "<repl>" src of
     Left perr -> pure (Left (ReplParseError perr))
     Right mdl -> do
       r <- runStateIO (compileModuleP (rcFlags ctx) ImpNormal mdl) (rcCache ctx)
-      let (((dmdl, _, _, _, _), _), cache') = unsafeCoerce r
+      let (((dmdl, syms, _, _, _), _), cache') = unsafeCoerce r
           cmdl = compileToCombinators dmdl
-      pure (Right (cmdl, cache'))
+      pure (Right (cmdl, cache', syms))
 
 runAction :: Cache -> TModule [LDef] -> Ident -> IO (Either ReplError ())
 runAction cache cmdl ident = do
@@ -243,7 +264,7 @@ replDefine ctx snippet = do
       cm <- compileModule ctx (moduleFromDefs defsWithNew)
       case cm of
         Left err'          -> pure (Left err')
-        Right (_, cache') -> pure (Right ctx{ rcDefs = defsWithNew, rcCache = cache' })
+        Right (_, cache', syms') -> pure (Right ctx{ rcDefs = defsWithNew, rcCache = cache', rcSyms = syms' })
 
 replRun :: ReplCtx -> String -> IO (Either ReplError ReplCtx)
 replRun ctx stmt = do
@@ -252,11 +273,11 @@ replRun ctx stmt = do
   cm <- compileModule ctx src
   case cm of
     Left err -> pure (Left err)
-    Right (cmdl, cache') -> do
+    Right (cmdl, cache', syms') -> do
       r <- runAction cache' cmdl runResultIdent
       case r of
         Left e  -> pure (Left e)
-        Right _ -> pure (Right ctx{ rcCache = cache' })
+        Right _ -> pure (Right ctx{ rcCache = cache', rcSyms = syms' })
 
 --------------------------------------------------------------------------------
 -- Public FFI API
@@ -270,16 +291,96 @@ mhsReplRun = runReplAction replRun
 
 mhsReplExecute :: ReplHandle -> CString -> CSize -> Ptr CString -> IO CInt
 mhsReplExecute = runReplAction replExecute
+mhsReplIsComplete :: ReplHandle -> CString -> CSize -> IO CString
+mhsReplIsComplete h srcPtr srcLen = do
+  ref <- deRefStablePtr h
+  src <- peekSource srcPtr srcLen
+  ctx <- readIORef ref
+  status <- replIsComplete ctx src
+  newCString status
+
+replIsComplete :: ReplCtx -> String -> IO String
+replIsComplete ctx snippet = do
+  if all isws snippet then pure "complete" else do
+    let ls = lines (ensureTrailingNewline snippet)
+        go n
+          | n < 0 = pure "invalid"
+          | otherwise = do
+              let (defLines, runLines) = splitAt n ls
+                  defPart = unlines defLines
+                  runPart = unlines (dropWhileEnd allwsLine runLines)
+                  candidateDefs = currentDefsSource ctx ++ defPart
+              if canParseDefinition candidateDefs
+                then if all allwsLine runLines
+                     then pure "complete"
+                     else if canParseExpression runPart || canParseExpression ("do\n" ++ indent runPart)
+                          then pure "complete"
+                          else go (n - 1)
+                else go (n - 1)
+    res <- go (length ls)
+    if res == "invalid" && isIncomplete snippet
+      then pure "incomplete"
+      else pure res
+
+mhsReplInspect :: ReplHandle -> CString -> CSize -> Ptr CString -> IO CInt
+mhsReplInspect h srcPtr srcLen resPtr = do
+  ref <- deRefStablePtr h
+  name <- peekSource srcPtr srcLen
+  ctx <- readIORef ref
+  result <- replInspect ctx name
+  case result of
+    Left e -> writeErrorCString resPtr (prettyReplError e) >> pure c_ERR
+    Right info -> newCString info >>= poke resPtr >> pure c_OK
+
+replInspect :: ReplCtx -> String -> IO (Either ReplError String)
+replInspect ctx name = do
+  let ident = mkIdent name
+      (typeTable, valueTable) = rcSyms ctx
+  case stLookup "value" ident valueTable of
+    Right (Entry _ sigma) -> return (Right $ name ++ " :: " ++ showExpr sigma)
+    Left _ -> case stLookup "type" ident typeTable of
+      Right (Entry _ kind) -> return (Right $ name ++ " :: " ++ showExpr kind)
+      Left _ -> return (Left $ ReplRuntimeError $ "Identifier not found: " ++ name)
+
+isws :: Char -> Bool
+isws c = c == ' ' || c == '\t' || c == '\n' || c == '\r'
+
+allwsLine :: String -> Bool
+allwsLine = all isws
+
+dropWhileEnd :: (a -> Bool) -> [a] -> [a]
+dropWhileEnd p = reverse . dropWhile p . reverse
 
 replExecute :: ReplCtx -> String -> IO (Either ReplError ReplCtx)
-replExecute ctx snippet =
-  let candidateDefs = currentDefsSource ctx ++ ensureTrailingNewline snippet
-  in
-    if canParseDefinition candidateDefs
-      then replDefine ctx snippet
-      else if canParseExpression snippet
-        then replRun ctx snippet
-        else pure (Left (ReplParseError "unable to parse snippet"))
+replExecute ctx snippet = do
+  let ls = lines (ensureTrailingNewline snippet)
+      go n
+        | n < 0 = pure $ Left (ReplParseError "unable to parse snippet")
+        | otherwise = do
+            let (defLines, runLines) = splitAt n ls
+                defPart = unlines defLines
+                runPart = unlines (dropWhileEnd allwsLine runLines)
+                candidateDefs = currentDefsSource ctx ++ defPart
+            if canParseDefinition candidateDefs
+              then if all allwsLine runLines
+                   then replDefine ctx defPart
+                   else if canParseExpression runPart
+                        then do
+                          eCtx' <- replDefine ctx defPart
+                          case eCtx' of
+                            Left err -> pure (Left err)
+                            Right ctx' -> replRun ctx' runPart
+                        else
+                          let runBlock = "do\n" ++ indent runPart
+                          in if canParseExpression runBlock
+                             then do
+                               eCtx' <- replDefine ctx defPart
+                               case eCtx' of
+                                 Left err -> pure (Left err)
+                                 Right ctx' -> replRun ctx' runBlock
+                             else go (n - 1)
+              else go (n - 1)
+  go (length ls)
 
 --------------------------------------------------------------------------------
 -- CString utilities
@@ -343,3 +444,57 @@ mhsReplCanParseExpression :: CString -> CSize -> IO CInt
 mhsReplCanParseExpression ptr len = do
   code <- peekSource ptr len
   pure $ if canParseExpression code then 1 else 0
+
+tokenize :: String -> [Token]
+tokenize = lex (SLoc "" 1 1)
+
+extractIdents :: [Token] -> [String]
+extractIdents ts = [s | TIdent _ _ s <- ts]
+
+completionCandidates :: String -> [String]
+completionCandidates = extractIdents . tokenize
+
+reservedIds :: [String]
+reservedIds =
+  [ "case", "class", "data", "default", "deriving", "do", "else"
+  , "foreign", "if", "import", "in", "infix", "infixl", "infixr"
+  , "instance", "let", "module", "newtype", "of", "then", "type"
+  , "where", "_"
+  ]
+
+mhsReplCompletionCandidates :: ReplHandle -> IO ()
+mhsReplCompletionCandidates h = do
+  ref <- deRefStablePtr h
+  ctx <- readIORef ref
+  let source = currentDefsSource ctx
+  let localIdents = completionCandidates source
+  let allCandidates = nub (reservedIds ++ localIdents)
+  mapM_ putStrLn allCandidates
+
+isIncomplete :: String -> Bool
+isIncomplete s = go [] s
+  where
+    go st [] = not (null st)
+    go st (c:cs)
+      | c `elem` "([{" = go (c:st) cs
+      | c `elem` ")]}" = case st of
+          [] -> False
+          (x:xs) -> if match x c then go xs cs else False
+      | c == '"' = goString st cs
+      | c == '\'' = goChar st cs
+      | otherwise = go st cs
+
+    goString st [] = True
+    goString st ('\\':'"':cs) = goString st cs
+    goString st ('"':cs) = go st cs
+    goString st (_:cs) = goString st cs
+
+    goChar st [] = True
+    goChar st ('\\':'\'':cs) = goChar st cs
+    goChar st ('\'':cs) = go st cs
+    goChar st (_:cs) = goChar st cs
+
+    match '(' ')' = True
+    match '[' ']' = True
+    match '{' '}' = True
+    match _ _ = False
