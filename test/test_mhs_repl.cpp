@@ -101,6 +101,20 @@ print "Hello World!")";
         expect_trim_eq(res.output, "5");
     };
 
+    "completion candidates include definitions and reserved ids"_test = [] {
+        auto& repl = repl_instance();
+        auto def_res = repl.execute("xh_completion_test_value = 7");
+        expect(def_res.ok) << def_res.error;
+
+        const auto candidates = repl.completion_candidates();
+        auto has = [&](std::string_view needle) {
+            return std::ranges::find(candidates, needle) != candidates.end();
+        };
+
+        expect(has("xh_completion_test_value"));
+        expect(has("where")); // reserved keyword
+    };
+
     "derived Typeable definitions stay usable"_test = [] {
         auto& repl = repl_instance();
         const auto type_def = R"(

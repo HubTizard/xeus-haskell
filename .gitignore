@@ -11,10 +11,17 @@
 *.gch
 *.pch
 
+# Linker files
+*.ilk
+
+# Debugger Files
+*.pdb
+
 # Compiled Dynamic libraries
 *.so
 *.dylib
 *.dll
+*.so.*
 
 # Fortran module files
 *.mod
@@ -32,24 +39,76 @@
 *.app
 *.wasm
 
-# Jupyter
-.ipynb_checkpoints/
-
-# Generated kernelspec
-share/jupyter/kernels/xhaskell/kernel.json
-
-# Build directory
+# Build directories
 build/
+Build/
+build-*/
 wasm-build/
 _output/
+Testing/
 
-# pixi environments
+# CMake generated files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+install_manifest.txt 
+compile_commands.json
+
+# Pixi
 .pixi
-*.egg-info
+pixi.lock
 
-# pixi environments
-.pixi/*
-!.pixi/config.toml
-
-.DS_Store
+# Jupyter
+.ipynb_checkpoints/
 .jupyterlite.doit.db
+share/jupyter/kernels/xhaskell/kernel.json
+
+# Python
+__pycache__/
+*.py[codz]
+*$py.class
+*.egg-info
+dist/
+develop-eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg
+MANIFEST
+.installed.cfg
+.cache
+.pytest_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+nosetests.xml
+coverage.xml
+*.cover
+*.py.cover
+.hypothesis/
+
+# Documentation
+/site
+docs/_build/
+
+# OS specific
+.DS_Store
+
+# IDEs
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp 
+*.log 
+*.bak 
+*.swp 
+
+# vcpkg
+vcpkg_installed/

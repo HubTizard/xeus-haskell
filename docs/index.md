@@ -41,7 +41,7 @@ pixi run -e wasm-build serve # JupyterLite is ready!
 ## A Deep Dive into Xeus-Haskell
 
 - [Contributing Guide](./CONTRIBUTING.md)
-- [Communication between C++ and Haskell](./COMMUNICATION.md)
-- [MicroHs REPL mechanism](./docs/REPL.md)
-- [Build system for Xeus Kernel and MicroHs](./BUILD.md)
-- [Known issues](./ISSUES.md)
+- [Communication Protocol](./COMMUNICATION.md)
+- [REPL Mechanism](./REPL.md)
+- [Roadmap & TODO](./TODO.md)
+- [AI Agent Guide](../AGENTS.md)
