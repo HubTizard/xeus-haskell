@@ -3,6 +3,8 @@ environments:
   default:
     channels:
     - url: https://conda.anaconda.org/conda-forge/
+    options:
+      pypi-prerelease-mode: if-necessary-or-explicit
     packages:
       linux-64:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/_libgcc_mutex-0.1-conda_forge.tar.bz2
@@ -728,6 +730,8 @@ environments:
     - url: https://conda.anaconda.org/conda-forge/
     indexes:
     - https://pypi.org/simple
+    options:
+      pypi-prerelease-mode: if-necessary-or-explicit
     packages:
       linux-64:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/_libgcc_mutex-0.1-conda_forge.tar.bz2
@@ -1016,6 +1020,8 @@ environments:
     channels:
     - url: https://repo.prefix.dev/emscripten-forge-dev/
     - url: https://conda.anaconda.org/conda-forge/
+    options:
+      pypi-prerelease-mode: if-necessary-or-explicit
     packages:
       linux-64:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/_libgcc_mutex-0.1-conda_forge.tar.bz2
@@ -1344,6 +1350,8 @@ environments:
     channels:
     - url: https://repo.prefix.dev/emscripten-forge-dev/
     - url: https://conda.anaconda.org/conda-forge/
+    options:
+      pypi-prerelease-mode: if-necessary-or-explicit
     packages:
       emscripten-wasm32:
       - conda: https://repo.prefix.dev/emscripten-forge-dev/noarch/emscripten-abi-3.1.73-h267e887_12.tar.bz2
@@ -1351,7 +1359,6 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/nlohmann_json-abi-3.12.0-h0f90c79_1.conda
       - conda: https://repo.prefix.dev/emscripten-forge-dev/emscripten-wasm32/xeus-5.2.4-h2072262_1.tar.bz2
       - conda: https://repo.prefix.dev/emscripten-forge-dev/emscripten-wasm32/xeus-lite-3.2.1-h2072262_0.tar.bz2
-      - conda: https://repo.prefix.dev/emscripten-forge-dev/emscripten-wasm32/xtl-0.7.7-h7223423_1.tar.bz2
 packages:
 - conda: https://conda.anaconda.org/conda-forge/linux-64/_libgcc_mutex-0.1-conda_forge.tar.bz2
   sha256: fe51de6107f9edc7aa4f786a70f4a883943bc9d39b3bb7307c04c41410990726
@@ -6840,13 +6847,6 @@ packages:
   license_family: BSD
   size: 1542570
   timestamp: 1758270937097
-- conda: https://repo.prefix.dev/emscripten-forge-dev/emscripten-wasm32/xtl-0.7.7-h7223423_1.tar.bz2
-  sha256: 5fc6f3df3038bbce4840c61a18a83fdb866cfc5218b9669b3557b8aa29f5ce1a
-  depends:
-  - emscripten-abi >=3.1.73,<3.1.74.0a0
-  license: BSD-3-Clause
-  size: 99397
-  timestamp: 1735915696022
 - conda: https://conda.anaconda.org/conda-forge/linux-64/yaml-0.2.5-h280c20c_3.conda
   sha256: 6d9ea2f731e284e9316d95fa61869fe7bbba33df7929f82693c121022810f4ad
   md5: a77f85f77be52ff59391544bfe73390a
