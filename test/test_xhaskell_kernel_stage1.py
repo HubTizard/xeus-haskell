@@ -239,6 +239,24 @@ class XHaskellKernelTests(jupyter_kernel_test.KernelTests):
         payload = self._extract_plain_text(outputs)
         self.assertIn("42", payload)
 
+    def test_type_command_reports_expression_type(self) -> None:
+        """`:type` should print the inferred type in cell output."""
+        self.flush_channels()
+        reply, outputs = self._execute_or_skip(code=':type "Hello World"')
+        self.assertEqual(reply["content"]["status"], "ok")
+        payload = self._extract_plain_text(outputs)
+        self.assertIn('"Hello World" ::', payload)
+        self.assertIn("[Char]", payload)
+
+    def test_kind_command_reports_type_kind(self) -> None:
+        """`:kind` should print the inferred kind in cell output."""
+        self.flush_channels()
+        reply, outputs = self._execute_or_skip(code=":kind Int")
+        self.assertEqual(reply["content"]["status"], "ok")
+        payload = self._extract_plain_text(outputs)
+        self.assertIn("Int ::", payload)
+        self.assertIn("*", payload)
+
     def test_multi_line_definition_followed_by_expression(self) -> None:
         """Edge Case: Multi-line definition (layout) followed by an expression."""
         self.flush_channels()
