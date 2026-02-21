@@ -33,6 +33,10 @@ function(fetch_and_build_microhs MICROHS_BIN MICROHS_SRC_DIR)
     install(
       DIRECTORY "${SOURCE_DIR}/"
       DESTINATION "${CMAKE_INSTALL_PREFIX}/share/microhs"
+      PATTERN ".github" EXCLUDE
+      PATTERN ".gitattributes" EXCLUDE
+      PATTERN ".gitignore" EXCLUDE
+      PATTERN ".gitmodules" EXCLUDE
     )
     set(MICROHS_SRC_DIR ${SOURCE_DIR} PARENT_SCOPE)
     set(MICROHS_BIN "${SOURCE_DIR}/bin/mhs${MICROHS_SUFFIX}" PARENT_SCOPE)
