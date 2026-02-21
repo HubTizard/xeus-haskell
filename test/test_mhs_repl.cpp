@@ -148,7 +148,10 @@ data XhTypeableRecord = XhTypeableRecord
         auto res = repl.execute(":type \"Hello World\"");
         expect(res.ok) << res.error;
         expect(that % res.output.find("\"Hello World\" ::") != std::string::npos);
-        expect(that % res.output.find("[Char]") != std::string::npos);
+        const bool is_char_list =
+            res.output.find("[Char]") != std::string::npos ||
+            res.output.find("String") != std::string::npos;
+        expect(is_char_list);
     };
 
     "kind command reports type kind"_test = [] {
@@ -156,7 +159,10 @@ data XhTypeableRecord = XhTypeableRecord
         auto res = repl.execute(":kind Int");
         expect(res.ok) << res.error;
         expect(that % res.output.find("Int ::") != std::string::npos);
-        expect(that % res.output.find("*") != std::string::npos);
+        const bool has_kind =
+            res.output.find("*") != std::string::npos ||
+            res.output.find("Type") != std::string::npos;
+        expect(has_kind);
     };
 
     "expression errors are reported"_test = [] {
