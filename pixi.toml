@@ -33,6 +33,7 @@ jupyter_kernel_test = ">=0.4.3"
 nbval = "*"
 pytest-rerunfailures = "*"
 jupyterlab = "*"
+playwright-python = ">=1.58.0,<2"
 
 #
 # docs
