@@ -143,6 +143,22 @@ data XhTypeableRecord = XhTypeableRecord
         expect_trim_eq(res.output, "30");
     };
 
+    "type command reports expression type"_test = [] {
+        auto& repl = repl_instance();
+        auto res = repl.execute(":type \"Hello World\"");
+        expect(res.ok) << res.error;
+        expect(that % res.output.find("\"Hello World\" ::") != std::string::npos);
+        expect(that % res.output.find("[Char]") != std::string::npos);
+    };
+
+    "kind command reports type kind"_test = [] {
+        auto& repl = repl_instance();
+        auto res = repl.execute(":kind Int");
+        expect(res.ok) << res.error;
+        expect(that % res.output.find("Int ::") != std::string::npos);
+        expect(that % res.output.find("*") != std::string::npos);
+    };
+
     "expression errors are reported"_test = [] {
         auto& repl = repl_instance();
         auto res = repl.execute("1 + \"1\"");
