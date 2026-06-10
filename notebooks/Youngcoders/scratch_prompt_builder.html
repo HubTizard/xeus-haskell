@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scratch Project Analysis — Prompt Builder</title>
+<style>
+  :root {
+    --bg:        #F7F6F2;
+    --surface:   #FFFFFF;
+    --surface2:  #F0EFE9;
+    --border:    #DDD9CE;
+    --text:      #1A1916;
+    --muted:     #7A776D;
+    --accent:    #2E6E52;
+    --accent-lt: #E4F0EB;
+    --accent-dk: #1D4D39;
+    --warn:      #C0440C;
+    --mono:      'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+    --sans:      'Inter', 'DM Sans', system-ui, sans-serif;
+    --radius:    8px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:        #141412;
+      --surface:   #1E1D1A;
+      --surface2:  #282520;
+      --border:    #38352E;
+      --text:      #F0EDE6;
+      --muted:     #8A8780;
+      --accent:    #4A9F7E;
+      --accent-lt: #0E3328;
+      --accent-dk: #7ECBAA;
+      --warn:      #E0724A;
+    }
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 15px; }
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  /* ── Header ── */
+  header {
+    background: var(--accent);
+    color: #fff;
+    padding: 2rem 2.5rem 1.75rem;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  header .eyebrow {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    opacity: 0.75;
+    margin-bottom: 0.4rem;
+  }
+  header h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+  }
+  header p {
+    font-size: 0.82rem;
+    opacity: 0.8;
+    max-width: 380px;
+    line-height: 1.5;
+    margin-top: 0.4rem;
+  }
+  .scratch-cat {
+    font-size: 3rem;
+    opacity: 0.35;
+    user-select: none;
+  }
+
+  /* ── Layout ── */
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    min-height: calc(100vh - 140px);
+  }
+  @media (max-width: 760px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+
+  /* ── Left panel ── */
+  .left {
+    padding: 1.75rem 2rem;
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+  }
+  .group + .group { margin-top: 1.5rem; }
+  .group-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+  .group-icon { font-size: 1rem; }
+  .group-title {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .group-select-all {
+    margin-left: auto;
+    font-size: 0.7rem;
+    color: var(--accent);
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: var(--sans);
+  }
+  .group-select-all:hover { background: var(--accent-lt); }
+
+  .check-list { display: flex; flex-direction: column; gap: 5px; }
+  .check-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 9px 11px;
+    border-radius: var(--radius);
+    border: 1.5px solid var(--border);
+    background: var(--surface);
+    cursor: pointer;
+    transition: border-color 0.12s, background 0.12s;
+    user-select: none;
+  }
+  .check-item:hover { border-color: var(--accent); }
+  .check-item.on {
+    border-color: var(--accent);
+    background: var(--accent-lt);
+  }
+  .check-item input[type=checkbox] {
+    margin-top: 2px;
+    accent-color: var(--accent);
+    flex-shrink: 0;
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+  }
+  .check-body {}
+  .check-name {
+    font-size: 0.82rem;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--text);
+  }
+  .check-desc {
+    font-size: 0.74rem;
+    color: var(--muted);
+    margin-top: 2px;
+    line-height: 1.45;
+  }
+
+  /* ── Right panel ── */
+  .right {
+    padding: 1.75rem 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    background: var(--surface2);
+  }
+  .right-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .right-title {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .pill-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .pill {
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    font-family: var(--sans);
+  }
+  .pill:hover { border-color: var(--accent); color: var(--accent); }
+
+  .prompt-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .prompt-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  textarea#promptOut {
+    flex: 1;
+    min-height: 280px;
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: var(--radius);
+    border: 1.5px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    line-height: 1.7;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.12s;
+  }
+  textarea#promptOut:focus { border-color: var(--accent); }
+  textarea#promptOut::placeholder { color: var(--muted); font-family: var(--sans); font-size: 0.78rem; }
+
+  .stats {
+    font-size: 0.72rem;
+    color: var(--muted);
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  .stats strong { color: var(--text); }
+
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn {
+    padding: 8px 18px;
+    border-radius: var(--radius);
+    border: 1.5px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: var(--sans);
+    transition: all 0.12s;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-lt); }
+  .btn.primary {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+  .btn.primary:hover { background: var(--accent-dk); border-color: var(--accent-dk); color: #fff; }
+  .btn.success { background: #1D6E3A; border-color: #1D6E3A; color: #fff; }
+
+  /* ── Footer ── */
+  footer {
+    padding: 1rem 2rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.72rem;
+    color: var(--muted);
+    background: var(--surface);
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="eyebrow">Tool</div>
+    <h1>Scratch Analysis<br>Prompt Builder</h1>
+    <p>Select the areas you want to investigate, then copy the compound prompt to use with any AI assistant.</p>
+  </div>
+  <div class="scratch-cat">🐱</div>
+</header>
+
+<div class="layout">
+  <!-- LEFT: checkboxes -->
+  <div class="left" id="leftPanel"></div>
+
+  <!-- RIGHT: output -->
+  <div class="right">
+    <div class="right-header">
+      <span class="right-title">Generated Prompt</span>
+      <div class="pill-row">
+        <button class="pill" onclick="selectAll()">Select all</button>
+        <button class="pill" onclick="clearAll()">Clear all</button>
+      </div>
+    </div>
+
+    <div class="prompt-wrap">
+      <span class="prompt-label">Prompt output</span>
+      <textarea id="promptOut" readonly placeholder="Select questions on the left to generate your prompt…"></textarea>
+    </div>
+
+    <div class="stats" id="stats"></div>
+
+    <div class="btn-row">
+      <button class="btn primary" id="copyBtn" onclick="copyPrompt()">Copy prompt</button>
+    </div>
+  </div>
+</div>
+
+<footer>Scratch Project Analysis Prompt Builder &nbsp;·&nbsp; Upload your .sb3 file to an AI assistant, paste the prompt, and run the analysis.</footer>
+
+<script>
+const GROUPS = [
+  {
+    id: 'matrix', icon: '📡', title: 'Broadcast Matrix',
+    items: [
+      { id:'m1', name:'Broadcast–receiver matrix', desc:'List every broadcast message, which sprite sends it, and which sprites receive it. Present as a matrix with senders as rows and receivers as columns.', on: true },
+      { id:'m2', name:'Orphaned broadcasts', desc:'Identify any messages that are sent but never received, or received but never sent anywhere in the project.', on: true },
+      { id:'m3', name:'Self-receiving sprites', desc:'Are there any sprites that both send and receive the same message, creating a self-loop?' },
+      { id:'m4', name:'Message naming issues', desc:'Check for typos, trailing spaces, or near-duplicate message names (e.g. hyphen vs underscore) that could cause missed signals at runtime.' },
+      { id:'m5', name:'Many-to-one broadcasts', desc:'Are there messages sent by multiple sprites to a single receiver? Note where this could cause ordering or timing issues.' },
+    ]
+  },
+  {
+    id: 'orphan', icon: '🧱', title: 'Orphaned Code',
+    items: [
+      { id:'o1', name:'Disconnected hat blocks', desc:'Find any top-level blocks that are not a recognised hat opcode — floating stacks with no trigger that can never run.', on: true },
+      { id:'o2', name:'Dead broadcast receivers', desc:'Find sprites with "when I receive" blocks for messages that are never broadcast anywhere in the project.' },
+      { id:'o3', name:'Unreachable clone logic', desc:'Is there a "when I start as a clone" block but no corresponding "create clone of" block to trigger it?' },
+      { id:'o4', name:'Unused variables', desc:'Are any variables set or changed but never read, or referenced in conditions but never assigned a value?' },
+    ]
+  },
+  {
+    id: 'backdrop', icon: '🖼', title: 'Backdrops',
+    items: [
+      { id:'b1', name:'Unused backdrops', desc:'List any backdrops in the stage costume list that are never switched to by any block in the project.', on: true },
+      { id:'b2', name:'Missing hide scripts', desc:'For each sprite, check whether it has a hide block triggered when backdrops where it should not appear are shown.' },
+      { id:'b3', name:'Backdrop switch triggers', desc:'For each backdrop, identify which sprite and which event (click, broadcast, key press) triggers the switch to it.' },
+      { id:'b4', name:'Unreferenced backdrop names', desc:'Are any backdrop names used in switch blocks that do not match any costume in the stage costume list?' },
+    ]
+  },
+  {
+    id: 'redundancy', icon: '🔁', title: 'Redundancy & Structure',
+    items: [
+      { id:'r1', name:'Duplicate scripts', desc:'Identify scripts that are identical or near-identical across multiple sprites or multiple hat blocks within the same sprite.' },
+      { id:'r2', name:'Copy-paste sprites', desc:'Are there sprites that appear to be manually duplicated rather than using Scratch\'s clone system?' },
+      { id:'r3', name:'Repeated show/hide patterns', desc:'Are there many "when backdrop switches to X → show/hide" blocks that could be replaced by a single forever loop checking the current backdrop?' },
+      { id:'r4', name:'Retry logic using copy-paste', desc:'Are ask-and-wait blocks repeated multiple times for retry behaviour instead of using a repeat-until loop?' },
+    ]
+  },
+  {
+    id: 'inventory', icon: '📦', title: 'Variables, Lists & Custom Blocks',
+    items: [
+      { id:'v1', name:'Variable inventory', desc:'List all variables in the project, noting whether each is global (for all sprites) or local (for one sprite), its initial value, and which sprites read or write it.', on: true },
+      { id:'v2', name:'List inventory', desc:'List all Scratch lists in the project, which sprites use them, and whether they are populated at runtime or pre-filled with data.', on: true },
+      { id:'v3', name:'Custom block inventory', desc:'List all custom blocks (My Blocks / procedures), which sprite defines each one, whether it runs without screen refresh, and which sprites call it.', on: true },
+      { id:'v4', name:'Unused or write-only variables', desc:'Are there any variables that are set but never read, or read but never given a value? Flag these as potential bugs.' },
+      { id:'v5', name:'Variable naming clarity', desc:'Are variable or list names clear and descriptive, or are there generic names (e.g. "my variable", "list") that make the code hard to read?' },
+      { id:'v6', name:'Scope issues', desc:'Are any variables global that should be local to a single sprite, or vice versa? Could shared global variables cause unintended side-effects between sprites?' },
+    ]
+  },
+];
+
+// State
+const state = {};
+GROUPS.forEach(g => g.items.forEach(q => { state[q.id] = q.on || false; }));
+
+function renderLeft() {
+  const panel = document.getElementById('leftPanel');
+  panel.innerHTML = '';
+  GROUPS.forEach(g => {
+    const div = document.createElement('div');
+    div.className = 'group';
+    const header = document.createElement('div');
+    header.className = 'group-header';
+    header.innerHTML = `<span class="group-icon">${g.icon}</span><span class="group-title">${g.title}</span>`;
+    const selAll = document.createElement('button');
+    selAll.className = 'group-select-all';
+    selAll.textContent = 'all';
+    selAll.onclick = () => {
+      const allOn = g.items.every(q => state[q.id]);
+      g.items.forEach(q => { state[q.id] = !allOn; });
+      renderLeft(); updatePrompt();
+    };
+    header.appendChild(selAll);
+    div.appendChild(header);
+
+    const list = document.createElement('div');
+    list.className = 'check-list';
+    g.items.forEach(q => {
+      const item = document.createElement('div');
+      item.className = 'check-item' + (state[q.id] ? ' on' : '');
+      item.innerHTML = `<input type="checkbox" id="cb_${q.id}" ${state[q.id] ? 'checked' : ''}>
+        <div class="check-body">
+          <div class="check-name">${q.name}</div>
+          <div class="check-desc">${q.desc}</div>
+        </div>`;
+      item.addEventListener('click', e => {
+        if (e.target.tagName !== 'INPUT') {
+          state[q.id] = !state[q.id];
+          renderLeft(); updatePrompt();
+        }
+      });
+      item.querySelector('input').addEventListener('change', e => {
+        state[q.id] = e.target.checked;
+        renderLeft(); updatePrompt();
+      });
+      list.appendChild(item);
+    });
+    div.appendChild(list);
+    panel.appendChild(div);
+  });
+}
+
+function buildPrompt() {
+  const selected = GROUPS.map(g => ({
+    ...g,
+    active: g.items.filter(q => state[q.id])
+  })).filter(g => g.active.length);
+
+  if (!selected.length) return '';
+
+  const lines = ['Analyse this Scratch (.sb3) project and answer the following questions:\n'];
+  let n = 1;
+  selected.forEach(g => {
+    lines.push(`--- ${g.title} ---`);
+    g.active.forEach(q => {
+      lines.push(`${n}. ${q.desc}`);
+      n++;
+    });
+    lines.push('');
+  });
+  lines.push('For each finding, name the sprite and block involved. Flag any issues that could cause bugs or unexpected behaviour at runtime.');
+  return lines.join('\n');
+}
+
+function updatePrompt() {
+  const prompt = buildPrompt();
+  const ta = document.getElementById('promptOut');
+  ta.value = prompt;
+
+  const total = Object.values(state).filter(Boolean).length;
+  const statsEl = document.getElementById('stats');
+  if (prompt) {
+    statsEl.innerHTML = `<span><strong>${total}</strong> question${total !== 1 ? 's' : ''} selected</span><span><strong>${prompt.length}</strong> characters</span><span><strong>${prompt.split('\n').filter(l => /^\d+\./.test(l)).length}</strong> numbered items</span>`;
+  } else {
+    statsEl.innerHTML = '<span>No questions selected</span>';
+  }
+
+  // reset copy button
+  const btn = document.getElementById('copyBtn');
+  btn.textContent = 'Copy prompt';
+  btn.className = 'btn primary';
+}
+
+function copyPrompt() {
+  const prompt = document.getElementById('promptOut').value;
+  if (!prompt) return;
+  navigator.clipboard.writeText(prompt).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = '✓ Copied!';
+    btn.className = 'btn success';
+    setTimeout(() => { btn.textContent = 'Copy prompt'; btn.className = 'btn primary'; }, 2000);
+  });
+}
+
+function selectAll() {
+  Object.keys(state).forEach(k => { state[k] = true; });
+  renderLeft(); updatePrompt();
+}
+
+function clearAll() {
+  Object.keys(state).forEach(k => { state[k] = false; });
+  renderLeft(); updatePrompt();
+}
+
+renderLeft();
+updatePrompt();
+</script>
+</body>
+</html>
