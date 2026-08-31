@@ -21,6 +21,7 @@ function(fetch_and_build_microhs MICROHS_BIN MICROHS_SRC_DIR)
 
     ExternalProject_Add(MicroHsProject
         URL ${MICROHS_URL}
+        URL_HASH SHA256=f23e8fd3fe6b132224145af528a7015d120b2bb54180bcfb4167bda8a7d513aa
         DOWNLOAD_EXTRACT_TIMESTAMP TRUE
         BUILD_IN_SOURCE TRUE
         PREFIX ${MICROHS_PREFIX}
@@ -37,6 +38,7 @@ function(fetch_and_build_microhs MICROHS_BIN MICROHS_SRC_DIR)
       PATTERN ".gitattributes" EXCLUDE
       PATTERN ".gitignore" EXCLUDE
       PATTERN ".gitmodules" EXCLUDE
+      PATTERN "lib/gmp" EXCLUDE
     )
     set(MICROHS_SRC_DIR ${SOURCE_DIR} PARENT_SCOPE)
     set(MICROHS_BIN "${SOURCE_DIR}/bin/mhs${MICROHS_SUFFIX}" PARENT_SCOPE)
@@ -44,7 +46,15 @@ endfunction()
 
 function(build_and_install_libmhs MICROHS_BIN MICROHS_SRC_DIR)
     set(OUTPUT_HEADER "${CMAKE_CURRENT_BINARY_DIR}/Repl_stub.h")
-    set(REPL_HS "${CMAKE_CURRENT_SOURCE_DIR}/src/Repl.hs")
+    set(REPL_LHS_DEPS
+        "${XHASKELL_MICROHS_DIR}/haskell/Repl.lhs"
+        "${XHASKELL_MICROHS_DIR}/haskell/Repl/Analysis.lhs"
+        "${XHASKELL_MICROHS_DIR}/haskell/Repl/Compiler.lhs"
+        "${XHASKELL_MICROHS_DIR}/haskell/Repl/Context.lhs"
+        "${XHASKELL_MICROHS_DIR}/haskell/Repl/Error.lhs"
+        "${XHASKELL_MICROHS_DIR}/haskell/Repl/Executor.lhs"
+        "${XHASKELL_MICROHS_DIR}/haskell/Repl/Utils.lhs"
+    )
     set(REPL_C "${CMAKE_CURRENT_BINARY_DIR}/Repl.c")
     set(EVAL_C "${MICROHS_SRC_DIR}/src/runtime/eval.c")
     set(REPL_O "${CMAKE_CURRENT_BINARY_DIR}/Repl.o")
@@ -58,7 +68,7 @@ function(build_and_install_libmhs MICROHS_BIN MICROHS_SRC_DIR)
 
     add_custom_command(
         OUTPUT ${REPL_C} ${OUTPUT_HEADER}
-        DEPENDS ${REPL_HS}
+        DEPENDS ${REPL_LHS_DEPS}
         COMMAND ${CMAKE_COMMAND} -E env
                 "MHSDIR=${MICROHS_SRC_DIR}"
                 ${MICROHS_BIN}
@@ -67,7 +77,7 @@ function(build_and_install_libmhs MICROHS_BIN MICROHS_SRC_DIR)
                 -i${MICROHS_SRC_DIR}/src
                 -i${MICROHS_SRC_DIR}/lib
                 -i${MICROHS_SRC_DIR}/paths
-                -i${CMAKE_CURRENT_SOURCE_DIR}/src
+                -i${XHASKELL_MICROHS_DIR}/haskell
                 Repl
                 -o Repl.c
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
@@ -84,7 +94,7 @@ function(build_and_install_libmhs MICROHS_BIN MICROHS_SRC_DIR)
     )
     target_compile_definitions(repl_obj PRIVATE __MHS__)
     if(EMSCRIPTEN)
-        target_compile_options(repl_obj PRIVATE -fPIC)
+        target_compile_options(repl_obj PRIVATE -fPIC -fwasm-exceptions)
     endif()
 
     add_library(eval_obj OBJECT ${EVAL_C})
@@ -97,7 +107,9 @@ function(build_and_install_libmhs MICROHS_BIN MICROHS_SRC_DIR)
     )
     target_compile_definitions(eval_obj PRIVATE __MHS__)
     if(EMSCRIPTEN)
-        target_compile_options(eval_obj PRIVATE -fPIC)
+        # eval.c implements MicroHs exceptions with setjmp/longjmp. Compile it
+        # with the same Wasm exception model as the final xeus executable.
+        target_compile_options(eval_obj PRIVATE -fPIC -fwasm-exceptions)
     endif()
 
     add_library(mhs_obj STATIC
@@ -105,7 +117,6 @@ function(build_and_install_libmhs MICROHS_BIN MICROHS_SRC_DIR)
         $<TARGET_OBJECTS:eval_obj>
     )
     add_dependencies(mhs_obj MicroHsProject)
-
     set(MHS_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR} PARENT_SCOPE)
     set(MHS_OBJ mhs_obj PARENT_SCOPE)
 endfunction()

@@ -44,6 +44,7 @@ build/
 Build/
 build-*/
 wasm-build/
+ghc-in-browser/
 _output/
 Testing/
 
@@ -51,7 +52,7 @@ Testing/
 CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
-Makefile
+/Makefile
 install_manifest.txt 
 compile_commands.json
 
@@ -62,7 +63,8 @@ pixi.lock
 # Jupyter
 .ipynb_checkpoints/
 .jupyterlite.doit.db
-share/jupyter/kernels/xhaskell/kernel.json
+xhaskell/microhs/share/jupyter/kernels/xhaskell-mhs/kernel.json
+xhaskell/ghc/share/jupyter/kernels/xhaskell-ghc/kernel.json
 
 # Python
 __pycache__/
@@ -96,6 +98,18 @@ coverage.xml
 # Documentation
 /site
 docs/_build/
+_minted-xhaskell/
+xhaskell.pdf
+xhaskell.aux
+xhaskell.fdb_latexmk
+xhaskell.fls
+xhaskell.log
+xhaskell.out
+xhaskell.toc
+xhaskell.xdv
+pdflatex*.fls
+xhaskell-dot2tex-fig*.dot
+xhaskell-dot2tex-fig*.tex
 
 # OS specific
 .DS_Store
@@ -112,3 +126,11 @@ docs/_build/
 
 # vcpkg
 vcpkg_installed/
+
+# JavaScript tests
+node_modules/
+playwright-report/
+test-results/
+
+# Verified corresponding-source download cache
+.cache/corresponding-source/
